@@ -8,6 +8,8 @@ from utils.auth import require_login, logout_button
 from utils.officer_store import format_officer_label, load_officers
 from utils.report_filename import achievement_report_file_name
 from utils.teacher_comment import (
+    fallback_activity_overview,
+    fallback_teacher_comment,
     generate_activity_overview,
     generate_activity_overview_with_preview,
     generate_teacher_comment,
@@ -31,13 +33,44 @@ st.title("成果書生成")
 st.caption("匯入問卷資料與活動照片，產生 Word 成果書。")
 
 
-def show_ai_preview(title: str, preview: dict[str, str] | None) -> None:
+def use_template_text(text_key: str, preview_key: str, template_text: str) -> None:
+    st.session_state[text_key] = template_text
+    st.session_state[preview_key] = {
+        "status": "已改用套模板。",
+        "raw_text": "",
+        "repaired_text": "",
+        "final_text": template_text,
+        "raw_debug": {},
+        "repaired_debug": {},
+    }
+
+
+def show_ai_preview(
+    title: str,
+    preview: dict[str, object] | None,
+    *,
+    text_key: str,
+    preview_key: str,
+    template_text: str,
+) -> None:
     if not preview:
         return
 
     key_prefix = title.replace(" ", "_")
+    status = str(preview.get("status", ""))
+
+    if status == "使用 Gemini 原始稿。":
+        st.success("AI 順利產出。")
+        st.button(
+            "改成套模板",
+            key=f"{key_prefix}_use_template",
+            on_click=use_template_text,
+            args=(text_key, preview_key, template_text),
+        )
+        return
+
     with st.expander(title, expanded=True):
-        st.caption(preview.get("status", ""))
+        st.caption(status)
 
         raw_text = preview.get("raw_text", "")
         if raw_text:
@@ -67,7 +100,7 @@ def show_ai_preview(title: str, preview: dict[str, str] | None) -> None:
 
         st.text_area(
             "最後採用文字",
-            preview.get("final_text", ""),
+            str(preview.get("final_text", "")),
             height=120,
             disabled=True,
             key=f"{key_prefix}_final",
@@ -163,7 +196,17 @@ activity_overview = st.text_area(
     key="activity_overview_text",
     height=140,
 )
-show_ai_preview("活動內容概述 AI 生成預覽", st.session_state["activity_overview_preview"])
+activity_overview_template = fallback_activity_overview(
+    activity_name=activity_name,
+    photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
+)
+show_ai_preview(
+    "活動內容概述 AI 生成預覽",
+    st.session_state["activity_overview_preview"],
+    text_key="activity_overview_text",
+    preview_key="activity_overview_preview",
+    template_text=activity_overview_template,
+)
 
 st.subheader("活動檢討與建議事項")
 activity_suggestion = st.text_area("活動檢討與建議事項", height=140)
@@ -198,7 +241,18 @@ teacher_comment = st.text_area(
     key="teacher_comment_text",
     height=120,
 )
-show_ai_preview("老師評語 AI 生成預覽", st.session_state["teacher_comment_preview"])
+teacher_comment_template = fallback_teacher_comment(
+    activity_name=activity_name,
+    activity_review=activity_suggestion,
+    photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
+)
+show_ai_preview(
+    "老師評語 AI 生成預覽",
+    st.session_state["teacher_comment_preview"],
+    text_key="teacher_comment_text",
+    preview_key="teacher_comment_preview",
+    template_text=teacher_comment_template,
+)
 
 fields = {
     
