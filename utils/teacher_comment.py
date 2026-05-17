@@ -47,6 +47,7 @@ def gemini_debug_info(data: dict, text: str) -> dict[str, object]:
         "text_length": len(text),
         "prompt_token_count": usage.get("promptTokenCount"),
         "candidates_token_count": usage.get("candidatesTokenCount"),
+        "thoughts_token_count": usage.get("thoughtsTokenCount"),
         "total_token_count": usage.get("totalTokenCount"),
         "safety_ratings": safety_ratings,
     }
@@ -88,9 +89,12 @@ def generate_gemini_result(
             }
         ],
         "generationConfig": {
-            "maxOutputTokens": 500,
+            "maxOutputTokens": 2048,
             "temperature": 0.4,
             "topP": 0.8,
+            "thinkingConfig": {
+                "thinkingBudget": 0,
+            },
         },
     }
     encoded_model = parse.quote(model, safe="")
