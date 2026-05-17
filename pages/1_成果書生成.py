@@ -6,7 +6,7 @@ from utils.achievement_report import (
 )
 from utils.auth import require_login, logout_button
 from utils.calendar_store import format_event_label, load_events
-from utils.officer_store import format_officer_label, load_officers
+from utils.officer_store import load_officers
 from utils.report_filename import achievement_report_file_name
 from utils.teacher_comment import (
     fallback_activity_overview,
@@ -174,7 +174,7 @@ with col2:
         selected_leader_index = st.selectbox(
             "活動負責人",
             list(range(len(officers))),
-            format_func=lambda index: format_officer_label(officers[index]),
+            format_func=lambda index: officers[index].get("姓名", ""),
             key="activity_leader_index",
         )
         selected_leader = officers[selected_leader_index]
