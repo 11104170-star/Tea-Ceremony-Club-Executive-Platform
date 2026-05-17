@@ -7,7 +7,12 @@ from utils.achievement_report import (
 from utils.auth import require_login, logout_button
 from utils.officer_store import format_officer_label, load_officers
 from utils.report_filename import achievement_report_file_name
-from utils.teacher_comment import generate_activity_overview, generate_teacher_comment
+from utils.teacher_comment import (
+    generate_activity_overview,
+    generate_activity_overview_with_preview,
+    generate_teacher_comment,
+    generate_teacher_comment_with_preview,
+)
 
 
 st.set_page_config(
@@ -24,6 +29,43 @@ with st.sidebar:
 
 st.title("成果書生成")
 st.caption("匯入問卷資料與活動照片，產生 Word 成果書。")
+
+
+def show_ai_preview(title: str, preview: dict[str, str] | None) -> None:
+    if not preview:
+        return
+
+    key_prefix = title.replace(" ", "_")
+    with st.expander(title, expanded=True):
+        st.caption(preview.get("status", ""))
+
+        raw_text = preview.get("raw_text", "")
+        if raw_text:
+            st.text_area(
+                "Gemini 原始輸出",
+                raw_text,
+                height=120,
+                disabled=True,
+                key=f"{key_prefix}_raw",
+            )
+
+        repaired_text = preview.get("repaired_text", "")
+        if repaired_text:
+            st.text_area(
+                "Gemini 重寫輸出",
+                repaired_text,
+                height=120,
+                disabled=True,
+                key=f"{key_prefix}_repaired",
+            )
+
+        st.text_area(
+            "最後採用文字",
+            preview.get("final_text", ""),
+            height=120,
+            disabled=True,
+            key=f"{key_prefix}_final",
+        )
 
 with st.expander("範本設定", expanded=False):
     st.write(f"目前預設範本：`{DEFAULT_TEMPLATE_PATH.name}`")
@@ -88,18 +130,23 @@ if "activity_overview_text" not in st.session_state:
 elif st.session_state["activity_overview_text"].strip() == LEGACY_ACTIVITY_OVERVIEW_TEXT:
     st.session_state["activity_overview_text"] = ""
 
+if "activity_overview_preview" not in st.session_state:
+    st.session_state["activity_overview_preview"] = None
+
 if st.button("由照片生成活動內容概述"):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
         with st.spinner("正在用 AI 生成活動內容概述..."):
-            st.session_state["activity_overview_text"] = generate_activity_overview(
+            preview = generate_activity_overview_with_preview(
                 api_key=api_key,
                 model=model,
                 activity_name=activity_name,
                 photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
                 photos=[flow_photo, group_photo, photo1, photo2, photo3],
             )
+            st.session_state["activity_overview_preview"] = preview
+            st.session_state["activity_overview_text"] = preview["final_text"]
         st.success("已由照片生成活動內容概述。")
     except Exception as exc:
         st.error("活動內容概述生成失敗，請確認 GEMINI_API_KEY 是否正確，或稍後再試。")
@@ -110,6 +157,7 @@ activity_overview = st.text_area(
     key="activity_overview_text",
     height=140,
 )
+show_ai_preview("活動內容概述 AI 生成預覽", st.session_state["activity_overview_preview"])
 
 st.subheader("活動檢討與建議事項")
 activity_suggestion = st.text_area("活動檢討與建議事項", height=140)
@@ -118,18 +166,23 @@ st.subheader("指導老師評語")
 if "teacher_comment_text" not in st.session_state:
     st.session_state["teacher_comment_text"] = ""
 
+if "teacher_comment_preview" not in st.session_state:
+    st.session_state["teacher_comment_preview"] = None
+
 if st.button("由照片說明生成老師評語"):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
         with st.spinner("正在用 AI 生成老師評語..."):
-            st.session_state["teacher_comment_text"] = generate_teacher_comment(
+            preview = generate_teacher_comment_with_preview(
                 api_key=api_key,
                 model=model,
                 activity_name=activity_name,
                 activity_review=activity_suggestion,
                 photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
             )
+            st.session_state["teacher_comment_preview"] = preview
+            st.session_state["teacher_comment_text"] = preview["final_text"]
     except Exception as exc:
         st.error("老師評語生成失敗，請確認 GEMINI_API_KEY 是否正確，或稍後再試。")
         st.exception(exc)
@@ -139,6 +192,7 @@ teacher_comment = st.text_area(
     key="teacher_comment_text",
     height=120,
 )
+show_ai_preview("老師評語 AI 生成預覽", st.session_state["teacher_comment_preview"])
 
 fields = {
     

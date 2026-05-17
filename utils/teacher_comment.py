@@ -207,6 +207,21 @@ def repair_generated_text(
     )
 
 
+def ai_preview(
+    *,
+    final_text: str,
+    raw_text: str = "",
+    repaired_text: str = "",
+    status: str,
+) -> dict[str, str]:
+    return {
+        "status": status,
+        "raw_text": raw_text,
+        "repaired_text": repaired_text,
+        "final_text": final_text,
+    }
+
+
 def generate_teacher_comment(
     *,
     api_key: str | None,
@@ -215,12 +230,30 @@ def generate_teacher_comment(
     activity_review: str,
     photo_descriptions: list[str],
 ) -> str:
+    return generate_teacher_comment_with_preview(
+        api_key=api_key,
+        model=model,
+        activity_name=activity_name,
+        activity_review=activity_review,
+        photo_descriptions=photo_descriptions,
+    )["final_text"]
+
+
+def generate_teacher_comment_with_preview(
+    *,
+    api_key: str | None,
+    model: str,
+    activity_name: str,
+    activity_review: str,
+    photo_descriptions: list[str],
+) -> dict[str, str]:
     if not api_key:
-        return fallback_teacher_comment(
+        fallback_text = fallback_teacher_comment(
             activity_name=activity_name,
             activity_review=activity_review,
             photo_descriptions=photo_descriptions,
         )
+        return ai_preview(final_text=fallback_text, status="未設定 API key，使用本機草稿。")
 
     descriptions = "\n".join(
         f"- {description.strip()}"
@@ -280,15 +313,30 @@ def generate_teacher_comment(
             )
         )
         if not is_weak_teacher_comment(repaired_text):
-            return repaired_text
+            return ai_preview(
+                final_text=repaired_text,
+                raw_text=generated_text,
+                repaired_text=repaired_text,
+                status="Gemini 原始稿不符合品質規則，已使用 Gemini 重寫稿。",
+            )
 
-        return fallback_teacher_comment(
+        fallback_text = fallback_teacher_comment(
             activity_name=activity_name,
             activity_review=activity_review,
             photo_descriptions=photo_descriptions,
         )
+        return ai_preview(
+            final_text=fallback_text,
+            raw_text=generated_text,
+            repaired_text=repaired_text,
+            status="Gemini 重寫後仍不符合品質規則，使用本機草稿。",
+        )
 
-    return generated_text
+    return ai_preview(
+        final_text=generated_text,
+        raw_text=generated_text,
+        status="使用 Gemini 原始稿。",
+    )
 
 
 def generate_activity_overview(
@@ -299,11 +347,29 @@ def generate_activity_overview(
     photo_descriptions: list[str],
     photos: list[object] | None = None,
 ) -> str:
+    return generate_activity_overview_with_preview(
+        api_key=api_key,
+        model=model,
+        activity_name=activity_name,
+        photo_descriptions=photo_descriptions,
+        photos=photos,
+    )["final_text"]
+
+
+def generate_activity_overview_with_preview(
+    *,
+    api_key: str | None,
+    model: str,
+    activity_name: str,
+    photo_descriptions: list[str],
+    photos: list[object] | None = None,
+) -> dict[str, str]:
     if not api_key:
-        return fallback_activity_overview(
+        fallback_text = fallback_activity_overview(
             activity_name=activity_name,
             photo_descriptions=photo_descriptions,
         )
+        return ai_preview(final_text=fallback_text, status="未設定 API key，使用本機草稿。")
 
     descriptions = "\n".join(
         f"- {description.strip()}"
@@ -365,11 +431,26 @@ def generate_activity_overview(
             )
         )
         if not is_weak_activity_overview(repaired_text):
-            return repaired_text
+            return ai_preview(
+                final_text=repaired_text,
+                raw_text=generated_text,
+                repaired_text=repaired_text,
+                status="Gemini 原始稿不符合品質規則，已使用 Gemini 重寫稿。",
+            )
 
-        return fallback_activity_overview(
+        fallback_text = fallback_activity_overview(
             activity_name=activity_name,
             photo_descriptions=photo_descriptions,
         )
+        return ai_preview(
+            final_text=fallback_text,
+            raw_text=generated_text,
+            repaired_text=repaired_text,
+            status="Gemini 重寫後仍不符合品質規則，使用本機草稿。",
+        )
 
-    return generated_text
+    return ai_preview(
+        final_text=generated_text,
+        raw_text=generated_text,
+        status="使用 Gemini 原始稿。",
+    )
