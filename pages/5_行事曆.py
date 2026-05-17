@@ -11,6 +11,7 @@ from utils.calendar_store import (
     load_events,
     storage_label,
 )
+from utils.officer_store import format_officer_label, load_officers
 
 
 st.set_page_config(
@@ -30,6 +31,7 @@ st.caption("記錄社課、會議與活動時程。")
 st.caption(f"目前儲存方式：{storage_label()}")
 
 events = load_events()
+officers = load_officers()
 
 st.subheader("月曆")
 today = date.today()
@@ -65,11 +67,12 @@ for week in calendar_weeks:
             st.markdown(heading)
             if day_events:
                 for event in day_events:
-                    time_text = event.get("時間", "")
+                    leader = event.get("活動負責人", "")
                     title = event.get("活動名稱", "")
                     location = event.get("地點", "")
-                    line = " ".join(item for item in (time_text, title) if item)
-                    st.caption(line)
+                    st.caption(title)
+                    if leader:
+                        st.caption(f"負責：{leader}")
                     if location:
                         st.caption(f"@ {location}")
             else:
@@ -82,7 +85,15 @@ with st.form("calendar_event_form", clear_on_submit=True):
     with col1:
         event_date = st.date_input("日期")
     with col2:
-        event_time = st.text_input("時間", placeholder="例如 18:30")
+        if officers:
+            selected_leader = st.selectbox(
+                "活動負責人",
+                officers,
+                format_func=format_officer_label,
+            )
+            event_leader = selected_leader.get("姓名", "")
+        else:
+            event_leader = st.text_input("活動負責人")
     with col3:
         title = st.text_input("活動名稱")
 
@@ -98,7 +109,7 @@ if submitted:
         add_event(
             title=title,
             date=event_date.strftime("%Y-%m-%d"),
-            time=event_time,
+            leader=event_leader,
             location=location,
             note=note,
         )

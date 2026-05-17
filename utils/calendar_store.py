@@ -23,7 +23,7 @@ def normalize_events(data: object) -> list[dict[str, str]]:
 
         title = str(item.get("活動名稱", "")).strip()
         date = str(item.get("日期", "")).strip()
-        time = str(item.get("時間", "")).strip()
+        leader = str(item.get("活動負責人", "")).strip()
         location = str(item.get("地點", "")).strip()
         note = str(item.get("備註", "")).strip()
 
@@ -31,14 +31,14 @@ def normalize_events(data: object) -> list[dict[str, str]]:
             events.append(
                 {
                     "日期": date,
-                    "時間": time,
+                    "活動負責人": leader,
                     "活動名稱": title,
                     "地點": location,
                     "備註": note,
                 }
             )
 
-    return sorted(events, key=lambda event: (event["日期"], event["時間"]))
+    return sorted(events, key=lambda event: (event["日期"], event["活動名稱"]))
 
 
 def load_events() -> list[dict[str, str]]:
@@ -71,12 +71,12 @@ def save_events(events: list[dict[str, str]]) -> None:
     )
 
 
-def add_event(*, title: str, date: str, time: str, location: str, note: str) -> None:
+def add_event(*, title: str, date: str, leader: str, location: str, note: str) -> None:
     events = load_events()
     events.append(
         {
             "日期": date.strip(),
-            "時間": time.strip(),
+            "活動負責人": leader.strip(),
             "活動名稱": title.strip(),
             "地點": location.strip(),
             "備註": note.strip(),
@@ -94,10 +94,10 @@ def delete_event(index: int) -> None:
 
 def format_event_label(event: dict[str, str]) -> str:
     date = event.get("日期", "")
-    time = event.get("時間", "")
+    leader = event.get("活動負責人", "")
     title = event.get("活動名稱", "")
 
-    when = " ".join(item for item in (date, time) if item)
+    when = " ".join(item for item in (date, leader) if item)
     if when:
         return f"{when}｜{title}"
 

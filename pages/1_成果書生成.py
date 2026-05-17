@@ -140,15 +140,20 @@ else:
 
 event_name = selected_calendar_event.get("活動名稱", "") if selected_calendar_event else ""
 event_date = selected_calendar_event.get("日期", "") if selected_calendar_event else ""
-event_time = selected_calendar_event.get("時間", "") if selected_calendar_event else ""
 event_place = selected_calendar_event.get("地點", "") if selected_calendar_event else ""
-event_date_text = " ".join(item for item in (event_date, event_time) if item)
+event_leader = selected_calendar_event.get("活動負責人", "") if selected_calendar_event else ""
 
 if st.session_state.get("last_calendar_event_index") != selected_calendar_event_index:
     if selected_calendar_event is not None:
         st.session_state["activity_name_input"] = event_name
         st.session_state["activity_place_input"] = event_place
-        st.session_state["activity_date_input"] = event_date_text
+        st.session_state["activity_date_input"] = event_date
+        if event_leader:
+            st.session_state["calendar_event_leader"] = event_leader
+            for index, officer in enumerate(officers):
+                if officer.get("姓名", "") == event_leader:
+                    st.session_state["activity_leader_index"] = index
+                    break
     st.session_state["last_calendar_event_index"] = selected_calendar_event_index
 
 col1, col2, col3 = st.columns(3)
@@ -163,15 +168,23 @@ with col2:
     school_people = st.number_input("本校學生人數", min_value=0, step=1)
     outside_people = st.number_input("校外人士人數", min_value=0, step=1)
     if officers:
-        selected_leader = st.selectbox(
+        if "activity_leader_index" not in st.session_state:
+            st.session_state["activity_leader_index"] = 0
+
+        selected_leader_index = st.selectbox(
             "活動負責人",
-            officers,
-            format_func=format_officer_label,
+            list(range(len(officers))),
+            format_func=lambda index: format_officer_label(officers[index]),
+            key="activity_leader_index",
         )
+        selected_leader = officers[selected_leader_index]
         activity_leader = selected_leader.get("姓名", "")
     else:
-        activity_leader = ""
-        st.selectbox("活動負責人", ["請先到幹部管理新增幹部"], disabled=True)
+        activity_leader = event_leader
+        if event_leader:
+            st.text_input("活動負責人", value=event_leader, disabled=True)
+        else:
+            st.selectbox("活動負責人", ["請先到幹部管理新增幹部"], disabled=True)
 
 with col3:
     phone = st.text_input("連絡電話")
