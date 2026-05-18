@@ -6,7 +6,7 @@ from pathlib import Path
 
 from docx import Document
 
-from utils.achievement_report import replace_text, set_font
+from utils.achievement_report import replace_text
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -34,9 +34,17 @@ def safe_int(value: object, default: int = 0) -> int:
 
 
 def set_cell_text(cell, text: str) -> None:
-    cell.text = str(text)
-    for paragraph in cell.paragraphs:
-        set_font(paragraph)
+    first_paragraph = cell.paragraphs[0]
+    if not first_paragraph.runs:
+        first_paragraph.add_run()
+
+    first_paragraph.runs[0].text = str(text)
+    for run in first_paragraph.runs[1:]:
+        run.text = ""
+
+    for paragraph in cell.paragraphs[1:]:
+        for run in paragraph.runs:
+            run.text = ""
 
 
 def officer_names_by_role(officers: list[dict[str, str]], role: str) -> str:

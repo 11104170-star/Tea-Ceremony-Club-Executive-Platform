@@ -134,15 +134,61 @@ def iter_paragraphs(doc):
 
 def replace_text(doc, replacements: dict[str, str]) -> None:
     for paragraph in iter_paragraphs(doc):
-        original_text = paragraph.text
-        new_text = original_text
+        replace_text_in_paragraph(paragraph, replacements)
 
-        for key, value in replacements.items():
-            new_text = new_text.replace(key, value or "")
 
-        if new_text != original_text:
-            paragraph.text = new_text
-            set_font(paragraph)
+def replace_text_in_paragraph(paragraph, replacements: dict[str, str]) -> None:
+    while True:
+        full_text = paragraph.text
+        matched_key = ""
+        matched_index = -1
+
+        for key in replacements:
+            index = full_text.find(key)
+            if index != -1 and (matched_index == -1 or index < matched_index):
+                matched_key = key
+                matched_index = index
+
+        if matched_index == -1:
+            return
+
+        replacement = str(replacements.get(matched_key, "") or "")
+        replace_range_in_runs(
+            paragraph,
+            start=matched_index,
+            end=matched_index + len(matched_key),
+            replacement=replacement,
+        )
+
+
+def replace_range_in_runs(paragraph, *, start: int, end: int, replacement: str) -> None:
+    positions = []
+    for run_index, run in enumerate(paragraph.runs):
+        for char_index, _ in enumerate(run.text):
+            positions.append((run_index, char_index))
+
+    if not positions or start >= len(positions):
+        return
+
+    end = min(end, len(positions))
+    start_run_index, start_char_index = positions[start]
+    end_run_index, end_char_index = positions[end - 1]
+    start_run = paragraph.runs[start_run_index]
+    end_run = paragraph.runs[end_run_index]
+
+    if start_run_index == end_run_index:
+        text = start_run.text
+        start_run.text = text[:start_char_index] + replacement + text[end_char_index + 1 :]
+        return
+
+    start_run.text = (
+        start_run.text[:start_char_index]
+        + replacement
+        + end_run.text[end_char_index + 1 :]
+    )
+
+    for run_index in range(start_run_index + 1, end_run_index + 1):
+        paragraph.runs[run_index].text = ""
 
 
 def image_stream(uploaded_file) -> BinaryIO | None:
