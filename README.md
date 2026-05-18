@@ -47,7 +47,7 @@ PASSWORD = "你的平台密碼"
 GEMINI_API_KEY = "你的 Gemini API key"
 GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_API_KEY = "你的 Groq API key"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GITHUB_TOKEN = "你的 GitHub fine-grained token"
 ```
 

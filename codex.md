@@ -49,7 +49,7 @@ PASSWORD = "平台密碼"
 GEMINI_API_KEY = "Gemini API key"
 GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_API_KEY = "Groq API key"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GITHUB_TOKEN = "GitHub fine-grained token"
 ```
 
@@ -57,5 +57,5 @@ GITHUB_TOKEN = "GitHub fine-grained token"
 
 `GEMINI_MODEL` 目前預設為 `gemini-2.5-flash`。Gemini calls in `utils/teacher_comment.py` disable thinking for short report text and request enough output tokens to avoid truncated responses.
 
-`GROQ_MODEL` 目前預設為 `llama-3.3-70b-versatile`。Groq fallback uses the OpenAI-compatible chat completions endpoint and is text-only, so activity overview fallback relies on photo descriptions rather than image bytes.
+`GROQ_MODEL` 目前預設為 `meta-llama/llama-4-scout-17b-16e-instruct`。Groq fallback uses the OpenAI-compatible chat completions endpoint and is text-only, so activity overview fallback relies on photo descriptions rather than image bytes.
 
