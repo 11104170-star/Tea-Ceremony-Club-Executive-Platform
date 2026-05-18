@@ -236,15 +236,20 @@ def generate_ai_result(
             last_error = str(exc)
 
     if groq_api_key:
-        result = generate_groq_result(
-            api_key=groq_api_key,
-            model=groq_model,
-            system_instruction=system_instruction,
-            prompt=prompt,
-        )
-        if last_error:
-            result["debug"]["fallback_from"] = last_error
-        return result
+        try:
+            result = generate_groq_result(
+                api_key=groq_api_key,
+                model=groq_model,
+                system_instruction=system_instruction,
+                prompt=prompt,
+            )
+            if last_error:
+                result["debug"]["fallback_from"] = last_error
+            return result
+        except RuntimeError as exc:
+            if last_error:
+                raise RuntimeError(f"{last_error}；{exc}") from exc
+            raise
 
     if last_error:
         raise RuntimeError(last_error)
@@ -514,14 +519,25 @@ def generate_teacher_comment_with_preview(
 """.strip()
 
     system_instruction = "你是嚴謹的學校成果書編輯，只寫具體、可提交的繁體中文行政文字。"
-    generated_result = generate_ai_result(
-        gemini_api_key=api_key,
-        gemini_model=model,
-        groq_api_key=groq_api_key,
-        groq_model=groq_model,
-        system_instruction=system_instruction,
-        prompt=prompt,
-    )
+    try:
+        generated_result = generate_ai_result(
+            gemini_api_key=api_key,
+            gemini_model=model,
+            groq_api_key=groq_api_key,
+            groq_model=groq_model,
+            system_instruction=system_instruction,
+            prompt=prompt,
+        )
+    except RuntimeError as exc:
+        fallback_text = fallback_teacher_comment(
+            activity_name=activity_name,
+            activity_review=activity_review,
+            photo_descriptions=photo_descriptions,
+        )
+        return ai_preview(
+            final_text=fallback_text,
+            status=f"AI 呼叫失敗，已使用本機草稿。{exc}",
+        )
     generated_text = clean_generated_text(str(generated_result["text"]))
     generated_debug = generated_result["debug"]
     generated_provider = str(generated_result.get("provider", "AI"))
@@ -529,15 +545,30 @@ def generate_teacher_comment_with_preview(
     generated_source = result_source(generated_result)
 
     if is_weak_teacher_comment(generated_text):
-        repaired_result = repair_generated_text_with_preview(
-            api_key=api_key,
-            model=model,
-            groq_api_key=groq_api_key,
-            groq_model=groq_model,
-            system_instruction=system_instruction,
-            original_prompt=prompt,
-            weak_text=generated_text,
-        )
+        try:
+            repaired_result = repair_generated_text_with_preview(
+                api_key=api_key,
+                model=model,
+                groq_api_key=groq_api_key,
+                groq_model=groq_model,
+                system_instruction=system_instruction,
+                original_prompt=prompt,
+                weak_text=generated_text,
+            )
+        except RuntimeError as exc:
+            fallback_text = fallback_teacher_comment(
+                activity_name=activity_name,
+                activity_review=activity_review,
+                photo_descriptions=photo_descriptions,
+            )
+            return ai_preview(
+                final_text=fallback_text,
+                raw_text=generated_text,
+                status=f"{generated_source} 原始稿不符合品質規則，AI 重寫失敗，已使用本機草稿。{exc}",
+                raw_debug=generated_debug,
+                provider=generated_provider,
+                model=generated_model,
+            )
         repaired_text = clean_generated_text(str(repaired_result["text"]))
         repaired_debug = repaired_result["debug"]
         repaired_provider = str(repaired_result.get("provider", "AI"))
@@ -659,15 +690,26 @@ def generate_activity_overview_with_preview(
 """.strip()
 
     system_instruction = "你是嚴謹的學校成果書編輯，只寫具體、可提交的繁體中文行政文字。"
-    generated_result = generate_ai_result(
-        gemini_api_key=api_key,
-        gemini_model=model,
-        groq_api_key=groq_api_key,
-        groq_model=groq_model,
-        system_instruction=system_instruction,
-        prompt=prompt,
-        images=photos,
-    )
+    try:
+        generated_result = generate_ai_result(
+            gemini_api_key=api_key,
+            gemini_model=model,
+            groq_api_key=groq_api_key,
+            groq_model=groq_model,
+            system_instruction=system_instruction,
+            prompt=prompt,
+            images=photos,
+        )
+    except RuntimeError as exc:
+        fallback_text = fallback_activity_overview(
+            activity_name=activity_name,
+            photo_descriptions=photo_descriptions,
+        )
+        return ai_preview(
+            final_text=fallback_text,
+            status=f"AI 呼叫失敗，已使用本機草稿。{exc}",
+        )
+
     generated_text = clean_generated_text(str(generated_result["text"]))
     generated_debug = generated_result["debug"]
     generated_provider = str(generated_result.get("provider", "AI"))
@@ -675,16 +717,31 @@ def generate_activity_overview_with_preview(
     generated_source = result_source(generated_result)
 
     if is_weak_activity_overview(generated_text):
-        repaired_result = repair_generated_text_with_preview(
-            api_key=api_key,
-            model=model,
-            groq_api_key=groq_api_key,
-            groq_model=groq_model,
-            system_instruction=system_instruction,
-            original_prompt=prompt,
-            weak_text=generated_text,
-            images=photos,
-        )
+        try:
+            repaired_result = repair_generated_text_with_preview(
+                api_key=api_key,
+                model=model,
+                groq_api_key=groq_api_key,
+                groq_model=groq_model,
+                system_instruction=system_instruction,
+                original_prompt=prompt,
+                weak_text=generated_text,
+                images=photos,
+            )
+        except RuntimeError as exc:
+            fallback_text = fallback_activity_overview(
+                activity_name=activity_name,
+                photo_descriptions=photo_descriptions,
+            )
+            return ai_preview(
+                final_text=fallback_text,
+                raw_text=generated_text,
+                status=f"{generated_source} 原始稿不符合品質規則，AI 重寫失敗，已使用本機草稿。{exc}",
+                raw_debug=generated_debug,
+                provider=generated_provider,
+                model=generated_model,
+            )
+
         repaired_text = clean_generated_text(str(repaired_result["text"]))
         repaired_debug = repaired_result["debug"]
         repaired_provider = str(repaired_result.get("provider", "AI"))
