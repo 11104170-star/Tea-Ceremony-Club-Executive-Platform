@@ -31,6 +31,7 @@ if st.session_state["authenticated"]:
 
     with col1:
         st.info("成果書生成\n\n整理活動資料並產生成果書文件。")
+        st.info("活動申請書生成\n\n帶入活動資料並產生申請計畫書。")
         st.info("問卷分析\n\n匯入問卷資料並檢視分析結果。")
 
     with col2:
