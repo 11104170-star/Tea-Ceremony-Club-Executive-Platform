@@ -10,12 +10,14 @@ from utils.application_form import (
 from utils.auth import require_login, logout_button
 from utils.calendar_store import format_event_label, load_events
 from utils.officer_store import load_officers
-
-
-DEFAULT_PURPOSE = (
-    "藉由茶席布置、茶具介紹與泡茶實作，引導參與學生認識茶道禮儀與茶文化，"
-    "並透過分工合作完成活動流程，增進社團成員間的互動與行政執行能力。"
+from utils.teacher_comment import (
+    DEFAULT_GROQ_MODEL,
+    fallback_application_purpose,
+    generate_application_purpose_with_preview,
 )
+
+
+DEFAULT_PURPOSE = fallback_application_purpose(activity_name="")
 
 
 st.set_page_config(
@@ -100,6 +102,8 @@ if "application_snack_purpose_input" not in st.session_state:
     st.session_state["application_snack_purpose_input"] = "活動點心與材料費"
 if "application_activity_purpose_input" not in st.session_state:
     st.session_state["application_activity_purpose_input"] = DEFAULT_PURPOSE
+if "application_activity_purpose_preview" not in st.session_state:
+    st.session_state["application_activity_purpose_preview"] = None
 
 col1, col2, col3 = st.columns(3)
 
@@ -154,6 +158,47 @@ with col3:
         "點心用途說明",
         key="application_snack_purpose_input",
     )
+
+purpose_col1, purpose_col2 = st.columns([1, 3])
+with purpose_col1:
+    generate_purpose = st.button("由活動名稱生成活動宗旨")
+with purpose_col2:
+    purpose_preview = st.session_state["application_activity_purpose_preview"]
+    if purpose_preview:
+        status = str(purpose_preview.get("status", ""))
+        provider = str(purpose_preview.get("provider", ""))
+        model = str(purpose_preview.get("model", ""))
+        model_text = f"{provider}: {model}" if model else provider
+        if status.startswith("使用 ") and status.endswith("原始稿。"):
+            st.success(f"AI 順利產出。調用模型：{model_text}")
+        else:
+            st.info(status)
+            if model_text:
+                st.caption(f"調用模型：{model_text}")
+
+if generate_purpose:
+    if not activity_name.strip():
+        st.error("請先輸入活動名稱，再生成活動宗旨。")
+    else:
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY")
+            model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+            groq_api_key = st.secrets.get("GROQ_API_KEY")
+            groq_model = st.secrets.get("GROQ_MODEL", DEFAULT_GROQ_MODEL)
+            with st.spinner("正在用 AI 生成活動宗旨..."):
+                preview = generate_application_purpose_with_preview(
+                    api_key=api_key,
+                    model=model,
+                    groq_api_key=groq_api_key,
+                    groq_model=groq_model,
+                    activity_name=activity_name,
+                )
+                st.session_state["application_activity_purpose_preview"] = preview
+                st.session_state["application_activity_purpose_input"] = preview["final_text"]
+            st.rerun()
+        except Exception as exc:
+            st.error("活動宗旨生成失敗，請確認 GEMINI_API_KEY / GROQ_API_KEY 是否正確，或稍後再試。")
+            st.exception(exc)
 
 activity_purpose = st.text_area(
     "活動宗旨",

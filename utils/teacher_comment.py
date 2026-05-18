@@ -321,6 +321,14 @@ def fallback_activity_overview(
     )
 
 
+def fallback_application_purpose(*, activity_name: str) -> str:
+    name = activity_name.strip() or "本次活動"
+    return (
+        f"{name}旨在透過茶席布置、茶具介紹與泡茶實作，引導參與學生認識茶道禮儀與茶文化，"
+        "並在活動分工與互動過程中培養團隊合作、溝通表達與行政執行能力。"
+    )
+
+
 def is_weak_activity_overview(text: str) -> bool:
     stripped = clean_generated_text(text)
     if len(stripped) < 45:
@@ -611,6 +619,73 @@ def generate_teacher_comment_with_preview(
         raw_debug=generated_debug,
         provider=generated_provider,
         model=generated_model,
+    )
+
+
+def generate_application_purpose_with_preview(
+    *,
+    api_key: str | None,
+    model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
+    activity_name: str,
+) -> dict[str, object]:
+    if not api_key and not groq_api_key:
+        fallback_text = fallback_application_purpose(activity_name=activity_name)
+        return ai_preview(final_text=fallback_text, status="未設定 API key，使用本機草稿。")
+
+    prompt = f"""
+請根據茶道社活動名稱，生成活動申請計畫書中的「活動宗旨」。
+
+活動名稱：{activity_name or "未填"}
+
+要求：
+- 使用繁體中文
+- 適合放在學校社團活動申請書
+- 語氣正式、清楚、可提交
+- 內容需包含活動目的、參與者能學到什麼，以及社團行政或團隊合作意義
+- 不要條列
+- 80 到 120 字，必須是一段完整文字並以句號結尾
+- 不要使用「豐富多元」、「收穫良多」、「圓滿成功」等套話
+- 不要捏造活動名稱以外無法推知的具體細節
+""".strip()
+
+    system_instruction = "你是嚴謹的學校活動申請書編輯，只寫具體、可提交的繁體中文行政文字。"
+    try:
+        generated_result = generate_ai_result(
+            gemini_api_key=api_key,
+            gemini_model=model,
+            groq_api_key=groq_api_key,
+            groq_model=groq_model,
+            system_instruction=system_instruction,
+            prompt=prompt,
+        )
+    except RuntimeError as exc:
+        fallback_text = fallback_application_purpose(activity_name=activity_name)
+        return ai_preview(
+            final_text=fallback_text,
+            status=f"AI 呼叫失敗，已使用本機草稿。{exc}",
+        )
+
+    generated_text = clean_generated_text(str(generated_result["text"]))
+    if not generated_text.endswith(("。", "！", "？")) or len(generated_text) < 40:
+        fallback_text = fallback_application_purpose(activity_name=activity_name)
+        return ai_preview(
+            final_text=fallback_text,
+            raw_text=generated_text,
+            status=f"{result_source(generated_result)} 原始稿不符合品質規則，使用本機草稿。",
+            raw_debug=generated_result["debug"],
+            provider=str(generated_result.get("provider", "AI")),
+            model=str(generated_result.get("model", "")),
+        )
+
+    return ai_preview(
+        final_text=generated_text,
+        raw_text=generated_text,
+        status=f"使用 {result_source(generated_result)} 原始稿。",
+        raw_debug=generated_result["debug"],
+        provider=str(generated_result.get("provider", "AI")),
+        model=str(generated_result.get("model", "")),
     )
 
 
