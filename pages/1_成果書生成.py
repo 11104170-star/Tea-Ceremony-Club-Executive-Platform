@@ -12,6 +12,7 @@ from utils.calendar_store import format_event_label, load_events
 from utils.officer_store import load_officers
 from utils.report_filename import achievement_report_file_name
 from utils.teacher_comment import (
+    DEFAULT_GROQ_MODEL,
     fallback_activity_overview,
     fallback_teacher_comment,
     generate_activity_overview,
@@ -63,8 +64,11 @@ def show_ai_preview(
     key_prefix = title.replace(" ", "_")
     status = str(preview.get("status", ""))
 
-    if status == "使用 Gemini 原始稿。":
-        st.success("AI 順利產出。")
+    if status.startswith("使用 ") and status.endswith("原始稿。"):
+        provider = str(preview.get("provider", "AI"))
+        model = str(preview.get("model", ""))
+        model_text = f"{provider}: {model}" if model else provider
+        st.success(f"AI 順利產出。調用模型：{model_text}")
         st.button(
             "改成套模板",
             key=f"{key_prefix}_use_template",
@@ -75,11 +79,16 @@ def show_ai_preview(
 
     with st.expander(title, expanded=True):
         st.caption(status)
+        provider = str(preview.get("provider", ""))
+        model = str(preview.get("model", ""))
+        if provider or model:
+            model_text = f"{provider}: {model}" if model else provider
+            st.info(f"調用模型：{model_text}")
 
         raw_text = preview.get("raw_text", "")
         if raw_text:
             st.text_area(
-                "Gemini 原始輸出",
+                "AI 原始輸出",
                 raw_text,
                 height=120,
                 disabled=True,
@@ -92,7 +101,7 @@ def show_ai_preview(
         repaired_text = preview.get("repaired_text", "")
         if repaired_text:
             st.text_area(
-                "Gemini 重寫輸出",
+                "AI 重寫輸出",
                 repaired_text,
                 height=120,
                 disabled=True,
@@ -231,10 +240,14 @@ if st.button("由照片生成活動內容概述"):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+        groq_api_key = st.secrets.get("GROQ_API_KEY")
+        groq_model = st.secrets.get("GROQ_MODEL", DEFAULT_GROQ_MODEL)
         with st.spinner("正在用 AI 生成活動內容概述..."):
             preview = generate_activity_overview_with_preview(
                 api_key=api_key,
                 model=model,
+                groq_api_key=groq_api_key,
+                groq_model=groq_model,
                 activity_name=activity_name,
                 photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
                 photos=[flow_photo, group_photo, photo1, photo2, photo3],
@@ -243,7 +256,7 @@ if st.button("由照片生成活動內容概述"):
             st.session_state["activity_overview_text"] = preview["final_text"]
         st.success("已由照片生成活動內容概述。")
     except Exception as exc:
-        st.error("活動內容概述生成失敗，請確認 GEMINI_API_KEY 是否正確，或稍後再試。")
+        st.error("活動內容概述生成失敗，請確認 GEMINI_API_KEY / GROQ_API_KEY 是否正確，或稍後再試。")
         st.exception(exc)
 
 activity_overview = st.text_area(
@@ -277,10 +290,14 @@ if st.button("由照片說明生成老師評語"):
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
         model = st.secrets.get("GEMINI_MODEL", "gemini-2.5-flash")
+        groq_api_key = st.secrets.get("GROQ_API_KEY")
+        groq_model = st.secrets.get("GROQ_MODEL", DEFAULT_GROQ_MODEL)
         with st.spinner("正在用 AI 生成老師評語..."):
             preview = generate_teacher_comment_with_preview(
                 api_key=api_key,
                 model=model,
+                groq_api_key=groq_api_key,
+                groq_model=groq_model,
                 activity_name=activity_name,
                 activity_review=activity_suggestion,
                 photo_descriptions=[photo1_desc, photo2_desc, photo3_desc],
@@ -288,7 +305,7 @@ if st.button("由照片說明生成老師評語"):
             st.session_state["teacher_comment_preview"] = preview
             st.session_state["teacher_comment_text"] = preview["final_text"]
     except Exception as exc:
-        st.error("老師評語生成失敗，請確認 GEMINI_API_KEY 是否正確，或稍後再試。")
+        st.error("老師評語生成失敗，請確認 GEMINI_API_KEY / GROQ_API_KEY 是否正確，或稍後再試。")
         st.exception(exc)
 
 teacher_comment = st.text_area(

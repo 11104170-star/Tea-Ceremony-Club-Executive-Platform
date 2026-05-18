@@ -5,6 +5,9 @@ import json
 from urllib import error, parse, request
 
 
+DEFAULT_GROQ_MODEL = "llama-3.3-70b-versatile"
+
+
 def generate_gemini_text(
     *,
     api_key: str,
@@ -133,7 +136,128 @@ def generate_gemini_result(
     return {
         "text": generated_text,
         "debug": gemini_debug_info(data, generated_text),
+        "provider": "Gemini",
+        "model": model,
     }
+
+
+def groq_debug_info(data: dict, text: str) -> dict[str, object]:
+    usage = data.get("usage", {})
+    choices = data.get("choices", [])
+    finish_reasons = [
+        choice.get("finish_reason")
+        for choice in choices
+        if choice.get("finish_reason")
+    ]
+
+    return {
+        "choice_count": len(choices),
+        "finish_reasons": finish_reasons,
+        "text_length": len(text),
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "completion_tokens": usage.get("completion_tokens"),
+        "total_tokens": usage.get("total_tokens"),
+    }
+
+
+def generate_groq_result(
+    *,
+    api_key: str,
+    model: str,
+    system_instruction: str,
+    prompt: str,
+) -> dict[str, object]:
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 1024,
+        "temperature": 0.4,
+        "top_p": 0.8,
+    }
+    req = request.Request(
+        "https://api.groq.com/openai/v1/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with request.urlopen(req, timeout=30) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except (OSError, error.HTTPError, json.JSONDecodeError) as exc:
+        raise RuntimeError("Groq API 呼叫失敗，請確認 GROQ_API_KEY 與 GROQ_MODEL。") from exc
+
+    texts = []
+    for choice in data.get("choices", []):
+        content = choice.get("message", {}).get("content")
+        if content:
+            texts.append(content)
+
+    generated_text = "\n".join(texts).strip()
+    if not generated_text:
+        raise RuntimeError("Groq API 未回傳文字內容。")
+
+    return {
+        "text": generated_text,
+        "debug": groq_debug_info(data, generated_text),
+        "provider": "Groq",
+        "model": model,
+    }
+
+
+def generate_ai_result(
+    *,
+    gemini_api_key: str | None,
+    gemini_model: str,
+    groq_api_key: str | None,
+    groq_model: str,
+    system_instruction: str,
+    prompt: str,
+    images: list[object] | None = None,
+) -> dict[str, object]:
+    last_error = ""
+
+    if gemini_api_key:
+        try:
+            return generate_gemini_result(
+                api_key=gemini_api_key,
+                model=gemini_model,
+                system_instruction=system_instruction,
+                prompt=prompt,
+                images=images,
+            )
+        except RuntimeError as exc:
+            last_error = str(exc)
+
+    if groq_api_key:
+        result = generate_groq_result(
+            api_key=groq_api_key,
+            model=groq_model,
+            system_instruction=system_instruction,
+            prompt=prompt,
+        )
+        if last_error:
+            result["debug"]["fallback_from"] = last_error
+        return result
+
+    if last_error:
+        raise RuntimeError(last_error)
+
+    raise RuntimeError("未設定可用的 AI API key。")
+
+
+def result_source(result: dict[str, object]) -> str:
+    provider = str(result.get("provider", "AI"))
+    model = str(result.get("model", ""))
+    if model:
+        return f"{provider}: {model}"
+    return provider
 
 
 def clean_generated_text(text: str) -> str:
@@ -228,8 +352,10 @@ def is_weak_teacher_comment(text: str) -> bool:
 
 def repair_generated_text(
     *,
-    api_key: str,
+    api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     system_instruction: str,
     original_prompt: str,
     weak_text: str,
@@ -238,6 +364,8 @@ def repair_generated_text(
     return repair_generated_text_with_preview(
         api_key=api_key,
         model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         system_instruction=system_instruction,
         original_prompt=original_prompt,
         weak_text=weak_text,
@@ -247,8 +375,10 @@ def repair_generated_text(
 
 def repair_generated_text_with_preview(
     *,
-    api_key: str,
+    api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     system_instruction: str,
     original_prompt: str,
     weak_text: str,
@@ -271,9 +401,11 @@ def repair_generated_text_with_preview(
 - 禁止使用「豐富多元」、「積極參與熱情」、「收穫良多」、「圓滿成功」等套話
 """.strip()
 
-    return generate_gemini_result(
-        api_key=api_key,
-        model=model,
+    return generate_ai_result(
+        gemini_api_key=api_key,
+        gemini_model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         system_instruction=system_instruction,
         prompt=repair_prompt,
         images=images,
@@ -288,6 +420,8 @@ def ai_preview(
     status: str,
     raw_debug: dict[str, object] | None = None,
     repaired_debug: dict[str, object] | None = None,
+    provider: str = "",
+    model: str = "",
 ) -> dict[str, object]:
     return {
         "status": status,
@@ -296,6 +430,8 @@ def ai_preview(
         "final_text": final_text,
         "raw_debug": raw_debug or {},
         "repaired_debug": repaired_debug or {},
+        "provider": provider,
+        "model": model,
     }
 
 
@@ -303,6 +439,8 @@ def generate_teacher_comment(
     *,
     api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     activity_name: str,
     activity_review: str,
     photo_descriptions: list[str],
@@ -310,6 +448,8 @@ def generate_teacher_comment(
     return generate_teacher_comment_with_preview(
         api_key=api_key,
         model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         activity_name=activity_name,
         activity_review=activity_review,
         photo_descriptions=photo_descriptions,
@@ -320,11 +460,13 @@ def generate_teacher_comment_with_preview(
     *,
     api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     activity_name: str,
     activity_review: str,
     photo_descriptions: list[str],
 ) -> dict[str, object]:
-    if not api_key:
+    if not api_key and not groq_api_key:
         fallback_text = fallback_teacher_comment(
             activity_name=activity_name,
             activity_review=activity_review,
@@ -372,33 +514,45 @@ def generate_teacher_comment_with_preview(
 """.strip()
 
     system_instruction = "你是嚴謹的學校成果書編輯，只寫具體、可提交的繁體中文行政文字。"
-    generated_result = generate_gemini_result(
-        api_key=api_key,
-        model=model,
+    generated_result = generate_ai_result(
+        gemini_api_key=api_key,
+        gemini_model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         system_instruction=system_instruction,
         prompt=prompt,
     )
     generated_text = clean_generated_text(str(generated_result["text"]))
     generated_debug = generated_result["debug"]
+    generated_provider = str(generated_result.get("provider", "AI"))
+    generated_model = str(generated_result.get("model", ""))
+    generated_source = result_source(generated_result)
 
     if is_weak_teacher_comment(generated_text):
         repaired_result = repair_generated_text_with_preview(
             api_key=api_key,
             model=model,
+            groq_api_key=groq_api_key,
+            groq_model=groq_model,
             system_instruction=system_instruction,
             original_prompt=prompt,
             weak_text=generated_text,
         )
         repaired_text = clean_generated_text(str(repaired_result["text"]))
         repaired_debug = repaired_result["debug"]
+        repaired_provider = str(repaired_result.get("provider", "AI"))
+        repaired_model = str(repaired_result.get("model", ""))
+        repaired_source = result_source(repaired_result)
         if not is_weak_teacher_comment(repaired_text):
             return ai_preview(
                 final_text=repaired_text,
                 raw_text=generated_text,
                 repaired_text=repaired_text,
-                status="Gemini 原始稿不符合品質規則，已使用 Gemini 重寫稿。",
+                status=f"{generated_source} 原始稿不符合品質規則，已使用 {repaired_source} 重寫稿。",
                 raw_debug=generated_debug,
                 repaired_debug=repaired_debug,
+                provider=repaired_provider,
+                model=repaired_model,
             )
 
         fallback_text = fallback_teacher_comment(
@@ -410,16 +564,20 @@ def generate_teacher_comment_with_preview(
             final_text=fallback_text,
             raw_text=generated_text,
             repaired_text=repaired_text,
-            status="Gemini 重寫後仍不符合品質規則，使用本機草稿。",
+            status=f"{repaired_source} 重寫後仍不符合品質規則，使用本機草稿。",
             raw_debug=generated_debug,
             repaired_debug=repaired_debug,
+            provider=repaired_provider,
+            model=repaired_model,
         )
 
     return ai_preview(
         final_text=generated_text,
         raw_text=generated_text,
-        status="使用 Gemini 原始稿。",
+        status=f"使用 {generated_source} 原始稿。",
         raw_debug=generated_debug,
+        provider=generated_provider,
+        model=generated_model,
     )
 
 
@@ -427,6 +585,8 @@ def generate_activity_overview(
     *,
     api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     activity_name: str,
     photo_descriptions: list[str],
     photos: list[object] | None = None,
@@ -434,6 +594,8 @@ def generate_activity_overview(
     return generate_activity_overview_with_preview(
         api_key=api_key,
         model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         activity_name=activity_name,
         photo_descriptions=photo_descriptions,
         photos=photos,
@@ -444,11 +606,13 @@ def generate_activity_overview_with_preview(
     *,
     api_key: str | None,
     model: str,
+    groq_api_key: str | None = None,
+    groq_model: str = DEFAULT_GROQ_MODEL,
     activity_name: str,
     photo_descriptions: list[str],
     photos: list[object] | None = None,
 ) -> dict[str, object]:
-    if not api_key:
+    if not api_key and not groq_api_key:
         fallback_text = fallback_activity_overview(
             activity_name=activity_name,
             photo_descriptions=photo_descriptions,
@@ -495,20 +659,27 @@ def generate_activity_overview_with_preview(
 """.strip()
 
     system_instruction = "你是嚴謹的學校成果書編輯，只寫具體、可提交的繁體中文行政文字。"
-    generated_result = generate_gemini_result(
-        api_key=api_key,
-        model=model,
+    generated_result = generate_ai_result(
+        gemini_api_key=api_key,
+        gemini_model=model,
+        groq_api_key=groq_api_key,
+        groq_model=groq_model,
         system_instruction=system_instruction,
         prompt=prompt,
         images=photos,
     )
     generated_text = clean_generated_text(str(generated_result["text"]))
     generated_debug = generated_result["debug"]
+    generated_provider = str(generated_result.get("provider", "AI"))
+    generated_model = str(generated_result.get("model", ""))
+    generated_source = result_source(generated_result)
 
     if is_weak_activity_overview(generated_text):
         repaired_result = repair_generated_text_with_preview(
             api_key=api_key,
             model=model,
+            groq_api_key=groq_api_key,
+            groq_model=groq_model,
             system_instruction=system_instruction,
             original_prompt=prompt,
             weak_text=generated_text,
@@ -516,14 +687,19 @@ def generate_activity_overview_with_preview(
         )
         repaired_text = clean_generated_text(str(repaired_result["text"]))
         repaired_debug = repaired_result["debug"]
+        repaired_provider = str(repaired_result.get("provider", "AI"))
+        repaired_model = str(repaired_result.get("model", ""))
+        repaired_source = result_source(repaired_result)
         if not is_weak_activity_overview(repaired_text):
             return ai_preview(
                 final_text=repaired_text,
                 raw_text=generated_text,
                 repaired_text=repaired_text,
-                status="Gemini 原始稿不符合品質規則，已使用 Gemini 重寫稿。",
+                status=f"{generated_source} 原始稿不符合品質規則，已使用 {repaired_source} 重寫稿。",
                 raw_debug=generated_debug,
                 repaired_debug=repaired_debug,
+                provider=repaired_provider,
+                model=repaired_model,
             )
 
         fallback_text = fallback_activity_overview(
@@ -534,14 +710,18 @@ def generate_activity_overview_with_preview(
             final_text=fallback_text,
             raw_text=generated_text,
             repaired_text=repaired_text,
-            status="Gemini 重寫後仍不符合品質規則，使用本機草稿。",
+            status=f"{repaired_source} 重寫後仍不符合品質規則，使用本機草稿。",
             raw_debug=generated_debug,
             repaired_debug=repaired_debug,
+            provider=repaired_provider,
+            model=repaired_model,
         )
 
     return ai_preview(
         final_text=generated_text,
         raw_text=generated_text,
-        status="使用 Gemini 原始稿。",
+        status=f"使用 {generated_source} 原始稿。",
         raw_debug=generated_debug,
+        provider=generated_provider,
+        model=generated_model,
     )

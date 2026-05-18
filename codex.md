@@ -28,7 +28,8 @@ streamlit run app.py
 - 從行事曆選取活動時，會自動帶入活動名稱、日期、地點與活動負責人。
 - 幹部職位固定為：社長、副社長、總務、攝錄、點心、文書。
 - 幹部列表可刪除、上移、下移、移到最上面。
-- Gemini 正常產出時只顯示「AI 順利產出」；若有修復或 fallback，才顯示預覽內容。
+- AI 生成會先使用 Gemini；若 Gemini 失敗或額度用完，會使用 Groq 作為文字備用模型。
+- AI 正常產出時顯示「AI 順利產出」與實際調用模型；若有修復或 fallback，才顯示預覽內容。
 
 ## Persistent Data
 
@@ -47,10 +48,14 @@ Streamlit Secrets 可設定：
 PASSWORD = "平台密碼"
 GEMINI_API_KEY = "Gemini API key"
 GEMINI_MODEL = "gemini-2.5-flash"
+GROQ_API_KEY = "Groq API key"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 GITHUB_TOKEN = "GitHub fine-grained token"
 ```
 
 `GITHUB_TOKEN` 需要 repo `Contents` 的 read/write 權限。
 
 `GEMINI_MODEL` 目前預設為 `gemini-2.5-flash`。Gemini calls in `utils/teacher_comment.py` disable thinking for short report text and request enough output tokens to avoid truncated responses.
+
+`GROQ_MODEL` 目前預設為 `llama-3.3-70b-versatile`。Groq fallback uses the OpenAI-compatible chat completions endpoint and is text-only, so activity overview fallback relies on photo descriptions rather than image bytes.
 

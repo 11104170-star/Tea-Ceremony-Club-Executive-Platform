@@ -46,6 +46,8 @@ pip install -r requirements.txt
 PASSWORD = "你的平台密碼"
 GEMINI_API_KEY = "你的 Gemini API key"
 GEMINI_MODEL = "gemini-2.5-flash"
+GROQ_API_KEY = "你的 Groq API key"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 GITHUB_TOKEN = "你的 GitHub fine-grained token"
 ```
 
@@ -66,9 +68,10 @@ streamlit run app.py
 - 填寫日期使用月曆選擇器，預設抓台灣時區日期，輸出格式為 `XXX 年 X 月 X 日`。
 - 可由照片與照片說明使用 Gemini 生成活動內容概述。
 - 可由活動檢討與照片說明使用 Gemini 生成指導老師評語。
+- Gemini 失敗或額度用完時，可用 Groq 作為文字備用模型；頁面會顯示實際調用的 provider 與 model。
 - 若 AI 輸出正常，頁面只顯示 AI 順利產出；若使用修復或模板，會顯示預覽供檢查。
 
-未設定 `GEMINI_API_KEY` 或 Gemini 呼叫失敗時，會使用本機規則產生可編輯草稿。
+未設定 `GEMINI_API_KEY` / `GROQ_API_KEY` 或所有 AI 呼叫失敗時，會使用本機規則產生可編輯草稿。
 
 ## 幹部管理
 
