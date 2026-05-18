@@ -54,10 +54,3 @@ GITHUB_TOKEN = "GitHub fine-grained token"
 
 `GEMINI_MODEL` 目前預設為 `gemini-2.5-flash`。Gemini calls in `utils/teacher_comment.py` disable thinking for short report text and request enough output tokens to avoid truncated responses.
 
-## Git
-
-Remote 使用 SSH：
-
-```text
-git@github.com:11104170-star/Tea-Ceremony-Club-Executive-Platform.git
-```
