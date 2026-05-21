@@ -19,7 +19,7 @@ streamlit run app.py
 - `pages/4_幹部管理.py`: 幹部名單管理，提供成果書與行事曆的活動負責人選項。
 - `pages/5_行事曆.py`: 月曆式活動管理，可供成果書帶入活動資料。
 - `pages/6_活動申請書生成.py`: 活動申請書生成，可從行事曆與幹部名單帶入活動資料。
-- `pages/7_常用連結.py`: 幹部常用網站入口，可新增、刪除、排序與直接跳轉。
+- `pages/7_常用連結.py`: 幹部常用網站入口，可新增、刪除、排序與直接跳轉；私密連結由 Streamlit Secrets 載入。
 
 ## Current Behavior
 
@@ -29,7 +29,8 @@ streamlit run app.py
 - 行事曆活動欄位使用 `活動負責人`，不使用時間欄位。
 - 從行事曆選取活動時，會自動帶入活動名稱、日期、地點與活動負責人。
 - 活動申請書使用 `assets/活動申請書模板.docx`，只替換 `{{...}}` 標註欄位，不調整未標註內容；活動進行可由活動名稱透過 AI 生成，一行一個流程，並可勾選是否包含破冰活動、點心 DIY 與健康聊齋；活動宗旨可再依活動進行生成。
-- 常用連結預設包含課外組空間借用頁面，資料儲存在 `data/useful_links.json`。
+- 常用連結預設包含課外組空間借用頁面，公開資料儲存在 `data/useful_links.json`。
+- 私密連結從 `OFFICER_UPLOAD_URL` / `PRIVATE_LINKS` 讀取，不寫入 GitHub，適合幹部雲端資料上傳網址。
 - 幹部職位固定為：社長、副社長、總務、攝錄、點心、文書。
 - 幹部列表可刪除、上移、下移、移到最上面。
 - AI 生成會先使用 Gemini；若 Gemini 失敗或額度用完，會使用 Groq 作為文字備用模型。
@@ -56,6 +57,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_API_KEY = "Groq API key"
 GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GITHUB_TOKEN = "GitHub fine-grained token"
+OFFICER_UPLOAD_URL = "幹部資料上傳網址"
+OFFICER_UPLOAD_NAME = "幹部資料上傳"
 ```
 
 `GITHUB_TOKEN` 需要 repo `Contents` 的 read/write 權限。

@@ -54,6 +54,8 @@ GEMINI_MODEL = "gemini-2.5-flash"
 GROQ_API_KEY = "你的 Groq API key"
 GROQ_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 GITHUB_TOKEN = "你的 GitHub fine-grained token"
+OFFICER_UPLOAD_URL = "你的幹部資料上傳網址"
+OFFICER_UPLOAD_NAME = "幹部資料上傳"
 ```
 
 3. 啟動平台：
@@ -104,6 +106,8 @@ streamlit run app.py
 ## 常用連結
 
 `常用連結` 頁面整理幹部常用網站，可直接跳轉，也可新增、刪除與調整順序。預設包含課外組空間借用頁面。
+
+若有不能公開放在 GitHub 的雲端上傳網址，請放在 Streamlit Secrets 的 `OFFICER_UPLOAD_URL`。它會顯示在私密連結區，不會寫入 `data/useful_links.json`。
 
 ## 永久儲存
 
