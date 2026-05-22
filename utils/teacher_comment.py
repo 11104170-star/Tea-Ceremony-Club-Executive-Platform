@@ -357,6 +357,11 @@ def generate_ai_result(
             else:
                 last_error = str(exc)
 
+    if has_images:
+        if last_error:
+            raise RuntimeError(last_error)
+        raise RuntimeError("圖片任務未設定可用的 Gemini 或 Hugging Face Vision API key。")
+
     if groq_api_key:
         try:
             result = generate_groq_result(
