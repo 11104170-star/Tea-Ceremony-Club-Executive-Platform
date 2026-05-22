@@ -39,6 +39,34 @@ def event_to_material(event: dict[str, str]) -> str:
     return "\n".join(line for line in lines if not line.endswith("："))
 
 
+def selected_ai_config(model_choice: str) -> dict[str, str]:
+    config = {
+        "gemini_api_key": secret_value("GEMINI_API_KEY"),
+        "gemini_model": secret_value("GEMINI_MODEL", "gemini-2.5-flash"),
+        "groq_api_key": secret_value("GROQ_API_KEY"),
+        "groq_model": secret_value("GROQ_MODEL", default_groq_model() or DEFAULT_GROQ_MODEL),
+        "hf_api_key": secret_value("HF_API_KEY"),
+        "hf_model": secret_value("HF_MODEL", default_hf_model()),
+        "hf_vision_model": secret_value("HF_VISION_MODEL", default_hf_vision_model()),
+    }
+
+    if model_choice == "Gemini":
+        config["groq_api_key"] = ""
+        config["hf_api_key"] = ""
+    elif model_choice == "Groq":
+        config["gemini_api_key"] = ""
+        config["hf_api_key"] = ""
+    elif model_choice == "Hugging Face":
+        config["gemini_api_key"] = ""
+        config["groq_api_key"] = ""
+    elif model_choice == "Hugging Face Vision":
+        config["gemini_api_key"] = ""
+        config["groq_api_key"] = ""
+        config["hf_model"] = config["hf_vision_model"]
+
+    return config
+
+
 with st.sidebar:
     st.success("已登入")
     logout_button()
@@ -86,6 +114,15 @@ with st.form("ai_tool_form"):
     with col5:
         length = st.selectbox("篇幅", ["短版", "一般", "詳細"])
 
+    model_choice = st.selectbox(
+        "AI 模型",
+        ["自動", "Gemini", "Groq", "Hugging Face", "Hugging Face Vision"],
+        help=(
+            "自動：有圖片時 Gemini → Hugging Face Vision；無圖片時 Gemini → Groq → Hugging Face。"
+            "Groq 只能處理文字，Hugging Face Vision 適合讀小宣圖片。"
+        ),
+    )
+
     material = st.text_area(
         "輸入素材",
         key="ai_tool_material",
@@ -104,16 +141,21 @@ with st.form("ai_tool_form"):
 if submitted:
     if not activity_name.strip() and not material.strip() and not images:
         st.error("請至少輸入活動名稱、素材，或上傳小宣圖片。")
+    elif images and model_choice == "Groq":
+        st.error("Groq 不能讀圖片。請改選「自動」、「Gemini」或「Hugging Face Vision」。")
+    elif not images and model_choice == "Hugging Face Vision":
+        st.error("Hugging Face Vision 需要上傳圖片。純文字請改選「自動」、「Gemini」、「Groq」或「Hugging Face」。")
     else:
+        ai_config = selected_ai_config(model_choice)
         with st.spinner("正在用 AI 生成內容..."):
             result = generate_ai_tool_content(
-                gemini_api_key=secret_value("GEMINI_API_KEY"),
-                gemini_model=secret_value("GEMINI_MODEL", "gemini-2.5-flash"),
-                groq_api_key=secret_value("GROQ_API_KEY"),
-                groq_model=secret_value("GROQ_MODEL", default_groq_model() or DEFAULT_GROQ_MODEL),
-                hf_api_key=secret_value("HF_API_KEY"),
-                hf_model=secret_value("HF_MODEL", default_hf_model()),
-                hf_vision_model=secret_value("HF_VISION_MODEL", default_hf_vision_model()),
+                gemini_api_key=ai_config["gemini_api_key"],
+                gemini_model=ai_config["gemini_model"],
+                groq_api_key=ai_config["groq_api_key"],
+                groq_model=ai_config["groq_model"],
+                hf_api_key=ai_config["hf_api_key"],
+                hf_model=ai_config["hf_model"],
+                hf_vision_model=ai_config["hf_vision_model"],
                 tool_type=tool_type,
                 material=material,
                 activity_name=activity_name,
@@ -124,6 +166,7 @@ if submitted:
             )
 
         st.session_state["ai_tool_result"] = result
+        st.session_state["ai_tool_model_choice"] = model_choice
 
 st.subheader("輸出結果")
 result = st.session_state.get("ai_tool_result")
@@ -131,6 +174,8 @@ if result:
     st.success(str(result.get("status", "已產生內容。")))
     if result.get("provider") and result.get("provider") != "本機草稿":
         st.caption(f"調用模型：{result.get('provider')} / {result.get('model')}")
+    if st.session_state.get("ai_tool_model_choice"):
+        st.caption(f"選擇模式：{st.session_state['ai_tool_model_choice']}")
 
     st.text_area(
         "產生結果",
